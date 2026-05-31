@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#000000">
+<title>PPL · HIT</title>
+<style>
+  :root {
+    --bg: #000000;
+    --surface: #1a1a1c;
+    --surface-2: #242427;
+    --separator: #2e2e31;
+    --text: #f2f2f2;
+    --text-dim: #8a8a8e;
+    --text-faint: #5c5c60;
+    --accent: #a6ff00;
+    --accent-dim: rgba(166, 255, 0, 0.14);
+    --radius: 16px;
+    --radius-sm: 10px;
+    --tap: 44px;
+    font-size: 17px;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    overscroll-behavior-y: contain;
+  }
+
+  body {
+    padding-bottom: calc(40px + env(safe-area-inset-bottom));
+  }
+
+  /* ---------- Sticky header ---------- */
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: rgba(0, 0, 0, 0.72);
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    padding: calc(env(safe-area-inset-top) + 12px) 16px 0;
+    border-bottom: 0.5px solid var(--separator);
+  }
+
+  .titlebar {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+
+  .titlebar h1 {
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin: 0;
+  }
+
+  .titlebar .sub {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-dim);
+    letter-spacing: 0.01em;
+  }
+
+  /* ---------- Segmented control (Apple style) ---------- */
+  .segmented {
+    display: flex;
+    background: var(--surface-2);
+    border-radius: var(--radius-sm);
+    padding: 3px;
+    gap: 2px;
+    position: relative;
+  }
+
+  .segmented button {
+    flex: 1;
+    appearance: none;
+    border: none;
+    background: transparent;
+    color: var(--text-dim);
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    padding: 9px 0;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: color 0.25s ease, background 0.25s ease;
+    min-height: 36px;
+  }
+
+  .segmented button.active {
+    background: var(--accent);
+    color: #0a0a0a;
+    box-shadow: 0 1px 6px rgba(166, 255, 0, 0.25);
+  }
+
+  /* ---------- Progress ---------- */
+  .progress-wrap {
+    padding: 12px 0 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .progress-track {
+    flex: 1;
+    height: 5px;
+    background: var(--surface-2);
+    border-radius: 99px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--accent);
+    border-radius: 99px;
+    transition: width 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+  }
+
+  .progress-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-dim);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    min-width: 78px;
+    text-align: right;
+  }
+
+  .progress-label .done { color: var(--accent); }
+
+  /* ---------- Content ---------- */
+  main { padding: 8px 16px 0; }
+
+  .section-label {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin: 26px 4px 10px;
+  }
+
+  .section-label:first-child { margin-top: 16px; }
+
+  /* ---------- Agenda rows / cards ---------- */
+  .card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    overflow: hidden;
+    border: 0.5px solid var(--separator);
+  }
+
+  .row {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 15px 16px;
+    min-height: var(--tap);
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .row + .row { border-top: 0.5px solid var(--separator); }
+
+  /* ---------- Checkbox ---------- */
+  .check {
+    flex-shrink: 0;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 2px solid var(--text-faint);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 1px;
+    transition: background 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+  }
+
+  .check svg {
+    width: 14px;
+    height: 14px;
+    opacity: 0;
+    transform: scale(0.4);
+    transition: opacity 0.18s ease, transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .row.checked .check,
+  .set-row.checked .check {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .row.checked .check svg,
+  .set-row.checked .check svg { opacity: 1; transform: scale(1); }
+  .row:active .check, .set-row:active .check { transform: scale(0.88); }
+
+  /* ---------- Row text ---------- */
+  .row-body { flex: 1; min-width: 0; }
+
+  .row-title {
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    line-height: 1.25;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    transition: color 0.2s ease;
+  }
+
+  .row.checked .row-title {
+    color: var(--text-faint);
+    text-decoration: line-through;
+    text-decoration-color: var(--text-faint);
+  }
+
+  .badge {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 6px;
+    background: var(--accent-dim);
+    color: var(--accent);
+    white-space: nowrap;
+  }
+
+  .badge.iso {
+    background: var(--surface-2);
+    color: var(--text-dim);
+  }
+
+  .row.checked .badge { opacity: 0.4; }
+
+  .row-dur {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-dim);
+    letter-spacing: 0.01em;
+  }
+  .row.checked .row-dur { color: var(--text-faint); }
+
+  .meta {
+    margin-top: 5px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.01em;
+  }
+
+  .meta .rest { color: var(--text-dim); font-weight: 500; }
+  .row.checked .meta { color: var(--text-faint); }
+
+  .note {
+    margin-top: 6px;
+    font-size: 12.5px;
+    line-height: 1.4;
+    color: var(--text-dim);
+  }
+
+  .row.checked .note { opacity: 0.45; }
+
+  /* Multi-set: stack the title row, then the set checkboxes */
+  .exercise { padding: 15px 16px; }
+  .exercise + .exercise { border-top: 0.5px solid var(--separator); }
+
+  .ex-head { margin-bottom: 12px; }
+
+  .sets {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .set-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 9px 0;
+    cursor: pointer;
+    user-select: none;
+    min-height: 40px;
+  }
+  .set-row + .set-row { border-top: 0.5px solid var(--separator); }
+
+  .set-row .check { width: 23px; height: 23px; margin-top: 0; }
+  .set-row .check svg { width: 12px; height: 12px; }
+
+  .set-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: 0.01em;
+  }
+  .set-row.checked .set-label {
+    color: var(--text-faint);
+    text-decoration: line-through;
+  }
+  .set-reps {
+    margin-left: auto;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+  }
+  .set-row.checked .set-reps { color: var(--text-faint); }
+
+  /* ---------- Reset ---------- */
+  .reset-wrap { padding: 32px 16px 8px; text-align: center; }
+  .reset {
+    appearance: none;
+    border: 0.5px solid var(--separator);
+    background: var(--surface);
+    color: var(--text-dim);
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 12px 22px;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+  }
+  .reset:active { background: var(--surface-2); }
+  .reset.armed { color: #ff453a; border-color: #ff453a; }
+
+  .footnote {
+    text-align: center;
+    font-size: 11px;
+    color: var(--text-faint);
+    padding: 14px 24px 0;
+    line-height: 1.5;
+  }
+
+  /* ---------- Done banner ---------- */
+  .done-banner {
+    margin: 18px 16px 0;
+    padding: 16px;
+    border-radius: var(--radius);
+    background: var(--accent-dim);
+    border: 0.5px solid rgba(166, 255, 0, 0.3);
+    color: var(--accent);
+    font-size: 14px;
+    font-weight: 600;
+    text-align: center;
+    letter-spacing: 0.01em;
+    display: none;
+  }
+  .done-banner.show { display: block; }
+
+  @keyframes pop {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.18); }
+    100% { transform: scale(1); }
+  }
+  .pop { animation: pop 0.3s ease; }
+</style>
+</head>
+<body>
+  <header>
+    <div class="segmented" role="tablist">
+      <button data-day="push" class="active" role="tab">Push</button>
+      <button data-day="pull" role="tab">Pull</button>
+      <button data-day="legs" role="tab">Legs</button>
+    </div>
+    <div class="progress-wrap">
+      <div class="progress-track"><div class="progress-fill" id="progFill"></div></div>
+      <div class="progress-label"><span class="done" id="progDone">0</span>/<span id="progTotal">0</span> done</div>
+    </div>
+  </header>
+
+  <div class="done-banner" id="doneBanner">Workout complete. Go stretch. 💪</div>
+
+  <main id="agenda"></main>
+
+  <div class="reset-wrap">
+    <button class="reset" id="resetBtn">Reset this day</button>
+  </div>
+  <p class="footnote">Every working set goes to (or within 1 rep of) clean failure.<br>Stop when form breaks — no extra reps, no pulses.</p>
+
+<script>
+const CHECK_SVG = '<svg viewBox="0 0 24 24" fill="none"><path d="M5 12.5l4.5 4.5L19 7" stroke="#0a0a0a" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+const PLAN = {
+  push: {
+    title: "Push",
+    warmup: "Light dynamic movement — arm swings, band pull-aparts to raise core temperature.",
+    rampup: "2 ramp-up sets (≈50%, ≈75% of working weight) before your first press. These don't count as working sets.",
+    exercises: [
+      { name: "Bench Press", variant: "Barbell or Machine", type: "compound", sets: 2, reps: "6–10", rest: "2–3 min", note: "Control the bar to mid-chest, press without bouncing. Machine or spotter — failure here can pin you." },
+      { name: "Incline Dumbbell Press", type: "compound", sets: 1, reps: "8–12", rest: "2–3 min", note: "Upper chest and front delts. Incline shifts emphasis higher than flat." },
+      { name: "Pec Deck or Cable Fly", type: "iso", sets: 1, reps: "10–12", rest: "60–90 sec", note: "Stretch and squeeze the chest directly. Safe to push hard solo." },
+      { name: "Overhead Press", variant: "Barbell or Machine", type: "compound", sets: 2, reps: "6–10", rest: "2–3 min", note: "Front and side delts plus triceps. Brace the core, don't lean back." },
+      { name: "Lateral Raise", variant: "Cable or Dumbbell", type: "iso", sets: 1, reps: "10–15", rest: "60–90 sec", note: "Side delts for width. Lead with the elbows, no swinging." },
+      { name: "Triceps Pushdown", variant: "Cable", type: "iso", sets: 1, reps: "8–12", rest: "60–90 sec", note: "Elbows pinned to your sides, full extension." },
+      { name: "Overhead Triceps Ext. or Dip", type: "iso", sets: 1, reps: "8–12", rest: "60–90 sec", note: "Long head of the triceps from a stretch. Dips add chest if you choose them." }
+    ]
+  },
+  pull: {
+    title: "Pull",
+    warmup: "Light dynamic movement — band pull-aparts, scapular pull-ups.",
+    rampup: "2 ramp-up sets (≈50%, ≈75% of working weight) before your first pull. These don't count as working sets.",
+    exercises: [
+      { name: "Pull-up or Lat Pulldown", variant: "Weighted if able", type: "compound", sets: 2, reps: "6–10", rest: "2–3 min", note: "Back width plus biceps. Elbows down and back, full stretch at the top." },
+      { name: "Barbell or Chest-Supported Row", type: "compound", sets: 2, reps: "8–10", rest: "2–3 min", note: "Back thickness. Chest-supported version spares the lower back." },
+      { name: "Seated Cable Row", type: "compound", sets: 1, reps: "8–12", rest: "2–3 min", note: "Squeeze the shoulder blades, don't lean back to heave it." },
+      { name: "Reverse Pec Deck or Face Pull", type: "iso", sets: 1, reps: "12–15", rest: "60–90 sec", note: "Rear delts and upper back. Light and controlled, higher reps." },
+      { name: "Barbell or EZ-Bar Curl", type: "iso", sets: 1, reps: "8–12", rest: "60–90 sec", note: "Elbows still, no swinging from the back." },
+      { name: "Incline Dumbbell Curl", type: "iso", sets: 1, reps: "8–12", rest: "60–90 sec", note: "Incline stretches the biceps for a different angle. Full hang at the bottom." }
+    ]
+  },
+  legs: {
+    title: "Legs",
+    warmup: "Light dynamic movement — leg swings, bodyweight squats.",
+    rampup: "2 ramp-up sets (≈50%, ≈75% of working weight) before your first squat. These don't count as working sets.",
+    exercises: [
+      { name: "Squat or Hack Squat", type: "compound", sets: 2, reps: "6–10", rest: "2–3 min", note: "Quads, glutes, hams together. Hack squat is safer to failure alone; barbell — use rack safeties." },
+      { name: "Romanian Deadlift", type: "compound", sets: 2, reps: "8–10", rest: "2–3 min", note: "Hams and glutes. Flat back, hips back — stop if the back rounds (form failure, not muscle failure)." },
+      { name: "Leg Press or Walking Lunge", type: "compound", sets: 1, reps: "10–12", rest: "2–3 min", note: "More quad and glute volume. Leg press lets you push hard without balance concerns." },
+      { name: "Leg Extension", type: "iso", sets: 1, reps: "10–15", rest: "60–90 sec", note: "Quad isolation. Safe to full failure — pause briefly at the top." },
+      { name: "Lying or Seated Leg Curl", type: "iso", sets: 1, reps: "10–15", rest: "60–90 sec", note: "Hamstring isolation. Control the negative, don't let it snap back." },
+      { name: "Standing Calf Raise", type: "iso", sets: 2, reps: "12–20", rest: "60–90 sec", note: "Full range — deep stretch at the bottom, full extension up. No bouncing." }
+    ]
+  }
+};
+
+const STORAGE_KEY = "ppl-hit-v1";
+let state = {};
+try { state = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; } catch (e) { state = {}; }
+
+function save() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+}
+
+let currentDay = "push";
+
+function itemKey(day, id) { return day + ":" + id; }
+function isChecked(day, id) { return !!state[itemKey(day, id)]; }
+function setChecked(day, id, val) {
+  state[itemKey(day, id)] = val;
+  if (!val) delete state[itemKey(day, id)];
+  save();
+}
+
+function buildIds(day) {
+  // Returns a flat list of every checkable id for the day (for progress)
+  const ids = ["warmup_dynamic", "warmup_ramp"];
+  PLAN[day].exercises.forEach((ex, i) => {
+    const lastEx = PLAN[day].exercises.length - 1;
+    for (let s = 1; s <= ex.sets; s++) {
+      ids.push("ex" + i + "_set" + s);
+      const finalRestOfDay = (i === lastEx) && (s === ex.sets);
+      if (!finalRestOfDay) ids.push("ex" + i + "_rest" + s);
+    }
+  });
+  ids.push("cooldown");
+  return ids;
+}
+
+function checkSvgEl() {
+  const span = document.createElement("span");
+  span.className = "check";
+  span.innerHTML = CHECK_SVG;
+  return span;
+}
+
+function makeSimpleRow(day, id, title, duration, note) {
+  const row = document.createElement("div");
+  row.className = "row" + (isChecked(day, id) ? " checked" : "");
+  row.appendChild(checkSvgEl());
+  const body = document.createElement("div");
+  body.className = "row-body";
+  const t = document.createElement("div");
+  t.className = "row-title";
+  t.appendChild(document.createTextNode(title));
+  if (duration) {
+    const d = document.createElement("span");
+    d.className = "row-dur";
+    d.textContent = duration;
+    t.appendChild(d);
+  }
+  body.appendChild(t);
+  if (note) { const n = document.createElement("div"); n.className = "note"; n.textContent = note; body.appendChild(n); }
+  row.appendChild(body);
+  row.addEventListener("click", () => {
+    const now = !isChecked(day, id);
+    setChecked(day, id, now);
+    row.classList.toggle("checked", now);
+    const c = row.querySelector(".check");
+    if (now) { c.classList.remove("pop"); void c.offsetWidth; c.classList.add("pop"); }
+    updateProgress();
+  });
+  return row;
+}
+
+function makeSetRow(day, id, label, right) {
+  const sr = document.createElement("div");
+  sr.className = "set-row" + (isChecked(day, id) ? " checked" : "");
+  sr.appendChild(checkSvgEl());
+  const lab = document.createElement("span");
+  lab.className = "set-label";
+  lab.textContent = label;
+  sr.appendChild(lab);
+  const r = document.createElement("span");
+  r.className = "set-reps";
+  r.textContent = right;
+  sr.appendChild(r);
+  sr.addEventListener("click", () => {
+    const now = !isChecked(day, id);
+    setChecked(day, id, now);
+    sr.classList.toggle("checked", now);
+    const c = sr.querySelector(".check");
+    if (now) { c.classList.remove("pop"); void c.offsetWidth; c.classList.add("pop"); }
+    updateProgress();
+  });
+  return sr;
+}
+
+function render() {
+  const day = currentDay;
+  const plan = PLAN[day];
+  const main = document.getElementById("agenda");
+  main.innerHTML = "";
+
+  // WARM-UP
+  const wlabel = document.createElement("div");
+  wlabel.className = "section-label";
+  wlabel.textContent = "Warm-up";
+  main.appendChild(wlabel);
+  const wcard = document.createElement("div");
+  wcard.className = "card";
+  wcard.appendChild(makeSimpleRow(day, "warmup_dynamic", "Dynamic warm-up", "2 min", plan.warmup));
+  wcard.appendChild(makeSimpleRow(day, "warmup_ramp", "Ramp-up sets", null, plan.rampup));
+  main.appendChild(wcard);
+
+  // EXERCISES
+  const elabel = document.createElement("div");
+  elabel.className = "section-label";
+  elabel.textContent = "Lifts";
+  main.appendChild(elabel);
+  const ecard = document.createElement("div");
+  ecard.className = "card";
+
+  plan.exercises.forEach((ex, i) => {
+    const block = document.createElement("div");
+    block.className = "exercise";
+
+    const head = document.createElement("div");
+    head.className = "ex-head";
+    const t = document.createElement("div");
+    t.className = "row-title";
+    t.appendChild(document.createTextNode(ex.name));
+    const badge = document.createElement("span");
+    badge.className = "badge" + (ex.type === "iso" ? " iso" : "");
+    badge.textContent = ex.type === "iso" ? "Isolation" : "Compound";
+    t.appendChild(badge);
+    head.appendChild(t);
+
+    const meta = document.createElement("div");
+    meta.className = "meta";
+    const variant = ex.variant ? ex.variant + " · " : "";
+    meta.innerHTML = variant + ex.sets + (ex.sets > 1 ? " sets" : " set") + " × " + ex.reps + " reps";
+    head.appendChild(meta);
+
+    const note = document.createElement("div");
+    note.className = "note";
+    note.textContent = ex.note;
+    head.appendChild(note);
+
+    block.appendChild(head);
+
+    const sets = document.createElement("div");
+    sets.className = "sets";
+    const lastEx = plan.exercises.length - 1;
+    for (let s = 1; s <= ex.sets; s++) {
+      sets.appendChild(makeSetRow(day, "ex" + i + "_set" + s, "Set " + s, ex.reps + " reps"));
+      const finalRestOfDay = (i === lastEx) && (s === ex.sets);
+      if (!finalRestOfDay) {
+        sets.appendChild(makeSetRow(day, "ex" + i + "_rest" + s, "Rest", ex.rest));
+      }
+    }
+    block.appendChild(sets);
+    ecard.appendChild(block);
+  });
+  main.appendChild(ecard);
+
+  // COOLDOWN
+  const clabel = document.createElement("div");
+  clabel.className = "section-label";
+  clabel.textContent = "Cooldown";
+  main.appendChild(clabel);
+  const ccard = document.createElement("div");
+  ccard.className = "card";
+  ccard.appendChild(makeSimpleRow(day, "cooldown", "Cooldown stretch", "8–10 min", "Static stretches for the muscles you trained. Slow it down and breathe."));
+  main.appendChild(ccard);
+
+  updateProgress();
+}
+
+function updateProgress() {
+  const ids = buildIds(currentDay);
+  const total = ids.length;
+  const done = ids.filter(id => isChecked(currentDay, id)).length;
+  document.getElementById("progDone").textContent = done;
+  document.getElementById("progTotal").textContent = total;
+  document.getElementById("progFill").style.width = (total ? (done / total * 100) : 0) + "%";
+  document.getElementById("doneBanner").classList.toggle("show", done === total && total > 0);
+}
+
+// Tabs
+document.querySelectorAll(".segmented button").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".segmented button").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    currentDay = btn.dataset.day;
+    if (typeof disarmReset === "function") disarmReset();
+    render();
+    window.scrollTo({ top: 0, behavior: "instant" in window ? "instant" : "auto" });
+  });
+});
+
+// Reset
+// Reset (two-tap confirm — works inside sandboxed iframes where confirm() is blocked)
+const resetBtn = document.getElementById("resetBtn");
+let resetArmed = false;
+let resetTimer = null;
+function disarmReset() {
+  resetArmed = false;
+  resetBtn.textContent = "Reset this day";
+  resetBtn.classList.remove("armed");
+  if (resetTimer) { clearTimeout(resetTimer); resetTimer = null; }
+}
+resetBtn.addEventListener("click", () => {
+  if (!resetArmed) {
+    resetArmed = true;
+    resetBtn.textContent = "Delete all progress";
+    resetBtn.classList.add("armed");
+    resetTimer = setTimeout(disarmReset, 3000);
+    return;
+  }
+  disarmReset();
+  buildIds(currentDay).forEach(id => setChecked(currentDay, id, false));
+  render();
+});
+
+render();
+</script>
+</body>
+</html>
