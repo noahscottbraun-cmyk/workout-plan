@@ -1,12 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#000000">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <title>PPL · HIT</title>
 <style>
   :root {
@@ -132,18 +132,6 @@
     transition: width 0.4s cubic-bezier(0.25, 1, 0.5, 1);
   }
 
-  .progress-label {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--text-dim);
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-    min-width: 78px;
-    text-align: right;
-  }
-
-  .progress-label .done { color: var(--accent); }
-
   /* ---------- Content ---------- */
   main { padding: 8px 16px 0; }
 
@@ -157,6 +145,15 @@
   }
 
   .section-label:first-child { margin-top: 16px; }
+
+  .block-label {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--accent);
+    padding: 14px 16px 4px;
+    text-transform: none;
+  }
 
   /* ---------- Agenda rows / cards ---------- */
   .card {
@@ -301,6 +298,8 @@
     min-height: 40px;
   }
   .set-row + .set-row { border-top: 0.5px solid var(--separator); }
+  .row + .set-row { border-top: 0.5px solid var(--separator); }
+  .card > .set-row { padding-left: 16px; padding-right: 16px; }
 
   .set-row .check { width: 23px; height: 23px; margin-top: 0; }
   .set-row .check svg { width: 12px; height: 12px; }
@@ -372,6 +371,107 @@
     100% { transform: scale(1); }
   }
   .pop { animation: pop 0.3s ease; }
+
+  /* ---------- Rest Timer Modal ---------- */
+  .timer-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    padding-bottom: calc(24px + env(safe-area-inset-bottom));
+  }
+  .timer-overlay.show { display: flex; }
+
+  .timer-modal {
+    width: 100%;
+    max-width: 340px;
+    background: var(--surface);
+    border: 0.5px solid var(--separator);
+    border-radius: 28px;
+    padding: 22px 22px 24px;
+    position: relative;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  }
+
+  .timer-close {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    border: none;
+    background: var(--surface-2);
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 2;
+  }
+  .timer-close svg { width: 13px; height: 13px; }
+
+  .timer-exname {
+    display: none;
+  }
+
+  .up-next {
+    text-align: center;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: 0.01em;
+    margin-top: 22px;
+    min-height: 18px;
+  }
+
+  .ring-wrap {
+    position: relative;
+    width: 220px;
+    height: 220px;
+    margin: 0 auto 4px;
+  }
+  .ring-wrap svg { transform: rotate(-90deg); display: block; }
+  .ring-bg { fill: none; stroke: var(--surface-2); }
+  .ring-fg {
+    fill: none;
+    stroke: var(--accent);
+    stroke-linecap: round;
+    transition: stroke-dashoffset 0.95s linear;
+  }
+
+  .ring-center {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+  }
+  .ring-time {
+    font-size: 52px;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+    line-height: 1;
+  }
+  .ring-sub {
+    margin-top: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-faint);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
 </style>
 </head>
 <body>
@@ -383,18 +483,38 @@
     </div>
     <div class="progress-wrap">
       <div class="progress-track"><div class="progress-fill" id="progFill"></div></div>
-      <div class="progress-label"><span class="done" id="progDone">0</span>/<span id="progTotal">0</span> done</div>
     </div>
   </header>
 
-  <div class="done-banner" id="doneBanner">Workout complete. Go stretch. 💪</div>
+  <div class="done-banner" id="doneBanner">Workout complete. Great work!</div>
 
   <main id="agenda"></main>
 
   <div class="reset-wrap">
     <button class="reset" id="resetBtn">Reset this day</button>
   </div>
-  <p class="footnote">Every working set goes to (or within 1 rep of) clean failure.<br>Stop when form breaks — no extra reps, no pulses.</p>
+
+  <div class="timer-overlay" id="timerOverlay">
+    <div class="timer-modal">
+      <button class="timer-close" id="timerClose" aria-label="Close timer">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+      </button>
+
+      <div class="ring-wrap">
+        <svg width="220" height="220" viewBox="0 0 220 220">
+          <circle class="ring-bg" cx="110" cy="110" r="100" stroke-width="14"></circle>
+          <circle class="ring-fg" id="ringFg" cx="110" cy="110" r="100" stroke-width="14"
+            stroke-dasharray="628.3" stroke-dashoffset="628.3"></circle>
+        </svg>
+        <div class="ring-center">
+          <div class="ring-time" id="ringTime">0:00</div>
+          <div class="ring-sub" id="ringSub">Rest</div>
+        </div>
+      </div>
+
+      <div class="up-next" id="upNext"></div>
+    </div>
+  </div>
 
 <script>
 const CHECK_SVG = '<svg viewBox="0 0 24 24" fill="none"><path d="M5 12.5l4.5 4.5L19 7" stroke="#0a0a0a" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -402,29 +522,29 @@ const CHECK_SVG = '<svg viewBox="0 0 24 24" fill="none"><path d="M5 12.5l4.5 4.5
 const PLAN = {
   push: {
     title: "Push",
-    warmup: "Light dynamic movement — arm swings, band pull-aparts to raise core temperature.",
+    warmup: "Light dynamic movement — arm swings and shoulder circles to raise core temperature.",
     rampup: "2 ramp-up sets (≈50%, ≈75% of working weight) before your first press. These don't count as working sets.",
     exercises: [
-      { name: "Bench Press", variant: "Barbell or Machine", type: "compound", sets: 2, reps: "6–10", rest: "2–3 min", note: "Control the bar to mid-chest, press without bouncing. Machine or spotter — failure here can pin you." },
-      { name: "Incline Dumbbell Press", type: "compound", sets: 1, reps: "8–12", rest: "2–3 min", note: "Upper chest and front delts. Incline shifts emphasis higher than flat." },
-      { name: "Pec Deck or Cable Fly", type: "iso", sets: 1, reps: "10–12", rest: "60–90 sec", note: "Stretch and squeeze the chest directly. Safe to push hard solo." },
-      { name: "Overhead Press", variant: "Barbell or Machine", type: "compound", sets: 2, reps: "6–10", rest: "2–3 min", note: "Front and side delts plus triceps. Brace the core, don't lean back." },
-      { name: "Lateral Raise", variant: "Cable or Dumbbell", type: "iso", sets: 1, reps: "10–15", rest: "60–90 sec", note: "Side delts for width. Lead with the elbows, no swinging." },
-      { name: "Triceps Pushdown", variant: "Cable", type: "iso", sets: 1, reps: "8–12", rest: "60–90 sec", note: "Elbows pinned to your sides, full extension." },
-      { name: "Overhead Triceps Ext. or Dip", type: "iso", sets: 1, reps: "8–12", rest: "60–90 sec", note: "Long head of the triceps from a stretch. Dips add chest if you choose them." }
+      { name: "Chest Press", variant: "Machine or Barbell Bench", type: "compound", block: "Press station", sets: 3, reps: "8–12", rest: "75s", note: "Lower under control to mid-chest. Keep shoulder blades pulled back and down. Drive up without bouncing. Stop 1 rep shy on sets 1–2, true failure on the last set." },
+      { name: "Incline Dumbbell Press", type: "compound", block: "Press station", sets: 3, reps: "8–12", rest: "60s", note: "Set the bench around 30°. Lower until you feel a stretch across the upper chest. Press the dumbbells up and slightly together. Failure on the last set; down-set if reps drop below range." },
+      { name: "Overhead Press", variant: "Machine or Dumbbell", type: "compound", block: "Press station", sets: 3, reps: "8–12", rest: "60s", note: "Brace your core and squeeze your glutes — don't lean back. Press straight overhead, not forward. Full lockout at the top. Failure on the last set." },
+      { name: "Pec Deck or Cable Fly", type: "iso", block: "Pec deck", sets: 2, reps: "12–15", rest: "60s", note: "Keep a slight bend in the elbows throughout. Lead with the elbows, not the hands. Squeeze hard at the midline, control the stretch back. Take both sets to failure." },
+      { name: "Cable Lateral Raise", type: "iso", block: "Cable station", sets: 3, reps: "12–20", rest: "45s", note: "Lead with the elbow, raise to shoulder height. Keep a soft elbow and no swinging or body english. Lower slowly. Failure on every set." },
+      { name: "Triceps Pushdown", type: "iso", block: "Cable station", sets: 3, reps: "10–15", rest: "45s", note: "Pin your elbows to your sides and keep them there. Fully extend at the bottom, control the return. Failure on every set." },
+      { name: "Overhead Cable Extension", type: "iso", block: "Cable station", sets: 2, reps: "10–15", rest: "45s", note: "Let the elbows travel behind your head for a deep stretch. Keep upper arms fixed, extend fully. Failure on both sets." }
     ]
   },
   pull: {
     title: "Pull",
-    warmup: "Light dynamic movement — band pull-aparts, scapular pull-ups.",
+    warmup: "Light dynamic movement — arm swings, scapular pull-ups.",
     rampup: "2 ramp-up sets (≈50%, ≈75% of working weight) before your first pull. These don't count as working sets.",
     exercises: [
-      { name: "Pull-up or Lat Pulldown", variant: "Weighted if able", type: "compound", sets: 2, reps: "6–10", rest: "2–3 min", note: "Back width plus biceps. Elbows down and back, full stretch at the top." },
-      { name: "Barbell or Chest-Supported Row", type: "compound", sets: 2, reps: "8–10", rest: "2–3 min", note: "Back thickness. Chest-supported version spares the lower back." },
-      { name: "Seated Cable Row", type: "compound", sets: 1, reps: "8–12", rest: "2–3 min", note: "Squeeze the shoulder blades, don't lean back to heave it." },
-      { name: "Reverse Pec Deck or Face Pull", type: "iso", sets: 1, reps: "12–15", rest: "60–90 sec", note: "Rear delts and upper back. Light and controlled, higher reps." },
-      { name: "Barbell or EZ-Bar Curl", type: "iso", sets: 1, reps: "8–12", rest: "60–90 sec", note: "Elbows still, no swinging from the back." },
-      { name: "Incline Dumbbell Curl", type: "iso", sets: 1, reps: "8–12", rest: "60–90 sec", note: "Incline stretches the biceps for a different angle. Full hang at the bottom." }
+      { name: "Lat Pulldown or Pull-Up", type: "compound", block: "Pulldown / row station", sets: 3, reps: "8–12", rest: "75s", note: "Start from a full stretch overhead. Drive your elbows down and back, not your hands. Pull to the upper chest and control the return. Stop 1 rep shy on sets 1–2, failure on the last." },
+      { name: "Seated Cable Row", type: "compound", block: "Pulldown / row station", sets: 3, reps: "8–12", rest: "60s", note: "Keep your torso upright — don't rock for momentum. Pull to your stomach, squeeze the shoulder blades together. Control the stretch forward. Failure on the last set." },
+      { name: "Chest-Supported Row", variant: "or Barbell Row", type: "compound", block: "Supported row", sets: 3, reps: "10–12", rest: "60s", note: "Let the weight stretch your back at the bottom. Row toward your hips, leading with the elbows. Pause and squeeze at the top. Stop 1 rep shy early, failure on the last set." },
+      { name: "Face Pull or Reverse Pec Deck", type: "iso", block: "Rear delts + biceps", sets: 3, reps: "15–20", rest: "45s", note: "Keep it light and controlled. Pull toward your forehead with elbows high. Squeeze the rear delts, don't shrug. Failure on every set." },
+      { name: "EZ-Bar or Cable Curl", type: "iso", block: "Rear delts + biceps", sets: 3, reps: "10–12", rest: "45s", note: "Keep your elbows pinned at your sides. Curl without swinging your back. Full squeeze at the top, controlled lowering. Failure on every set." },
+      { name: "Incline Dumbbell Curl", type: "iso", block: "Rear delts + biceps", sets: 3, reps: "10–12", rest: "45s", note: "Let your arms hang fully behind your torso for the stretch. Curl without letting the elbows drift forward. Failure on every set." }
     ]
   },
   legs: {
@@ -432,17 +552,17 @@ const PLAN = {
     warmup: "Light dynamic movement — leg swings, bodyweight squats.",
     rampup: "2 ramp-up sets (≈50%, ≈75% of working weight) before your first squat. These don't count as working sets.",
     exercises: [
-      { name: "Squat or Hack Squat", type: "compound", sets: 2, reps: "6–10", rest: "2–3 min", note: "Quads, glutes, hams together. Hack squat is safer to failure alone; barbell — use rack safeties." },
-      { name: "Romanian Deadlift", type: "compound", sets: 2, reps: "8–10", rest: "2–3 min", note: "Hams and glutes. Flat back, hips back — stop if the back rounds (form failure, not muscle failure)." },
-      { name: "Leg Press or Walking Lunge", type: "compound", sets: 1, reps: "10–12", rest: "2–3 min", note: "More quad and glute volume. Leg press lets you push hard without balance concerns." },
-      { name: "Leg Extension", type: "iso", sets: 1, reps: "10–15", rest: "60–90 sec", note: "Quad isolation. Safe to full failure — pause briefly at the top." },
-      { name: "Lying or Seated Leg Curl", type: "iso", sets: 1, reps: "10–15", rest: "60–90 sec", note: "Hamstring isolation. Control the negative, don't let it snap back." },
-      { name: "Standing Calf Raise", type: "iso", sets: 2, reps: "12–20", rest: "60–90 sec", note: "Full range — deep stretch at the bottom, full extension up. No bouncing." }
+      { name: "Squat or Hack Squat", type: "compound", block: "Rack / free-weight zone", sets: 3, reps: "8–12", rest: "90s", note: "Brace your core and keep your chest up. Push your knees out, descend to at least parallel. Drive through mid-foot. Stay 1–2 reps shy — never to true failure under load. Use the rack safeties." },
+      { name: "Romanian Deadlift", type: "compound", block: "Rack / free-weight zone", sets: 3, reps: "10–12", rest: "75s", note: "Soft knees, push your hips back. Keep a flat back and the bar close to your legs. Feel the hamstring stretch, then drive your hips forward. Stay 1–2 reps shy; stop if your back rounds." },
+      { name: "Leg Press", type: "compound", block: "Machine zone", sets: 3, reps: "12–15", rest: "60s", note: "Feet mid-platform, knees tracking over your toes. Lower until your knees reach ~90° without your lower back rounding. Don't lock out hard at the top. Failure on the last set." },
+      { name: "Leg Extension", type: "iso", block: "Machine zone", sets: 3, reps: "12–15", rest: "60s", note: "Pause and squeeze the quads at the top. Lower under control, don't let it slam. Failure on every set; down-set as you fatigue." },
+      { name: "Seated or Lying Leg Curl", type: "iso", block: "Machine zone", sets: 3, reps: "12–15", rest: "60s", note: "Keep your hips down on the pad. Curl all the way, squeeze at the bottom. Control the negative — don't let it snap back. Failure on every set." },
+      { name: "Calf Raise", variant: "Machine or Standing", type: "iso", block: "Machine zone", sets: 3, reps: "15–20", rest: "45s", note: "Drop into a deep stretch at the bottom, pause briefly. Rise to full extension on the toes. No bouncing through the reps. Failure on every set." }
     ]
   }
 };
 
-const STORAGE_KEY = "ppl-hit-v1";
+const STORAGE_KEY = "ppl-hit-v2";
 let state = {};
 try { state = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; } catch (e) { state = {}; }
 
@@ -462,7 +582,7 @@ function setChecked(day, id, val) {
 
 function buildIds(day) {
   // Returns a flat list of every checkable id for the day (for progress)
-  const ids = ["warmup_dynamic", "warmup_ramp"];
+  const ids = ["warmup_dynamic", "warmup_ramp1", "warmup_ramp2"];
   PLAN[day].exercises.forEach((ex, i) => {
     const lastEx = PLAN[day].exercises.length - 1;
     for (let s = 1; s <= ex.sets; s++) {
@@ -511,7 +631,7 @@ function makeSimpleRow(day, id, title, duration, note) {
   return row;
 }
 
-function makeSetRow(day, id, label, right) {
+function makeSetRow(day, id, label, right, restSpec) {
   const sr = document.createElement("div");
   sr.className = "set-row" + (isChecked(day, id) ? " checked" : "");
   sr.appendChild(checkSvgEl());
@@ -530,8 +650,17 @@ function makeSetRow(day, id, label, right) {
     const c = sr.querySelector(".check");
     if (now) { c.classList.remove("pop"); void c.offsetWidth; c.classList.add("pop"); }
     updateProgress();
+    if (now && restSpec && window.openTimer) window.openTimer(restSpec);
   });
   return sr;
+}
+
+// Parse a rest string like "45s", "60–75s", "75–90s" into {low, high} seconds
+function parseRest(restStr) {
+  const nums = (restStr.match(/\d+/g) || []).map(Number);
+  if (nums.length === 0) return { low: 60, high: 60 };
+  if (nums.length === 1) return { low: nums[0], high: nums[0] };
+  return { low: nums[0], high: nums[1] };
 }
 
 function render() {
@@ -547,8 +676,9 @@ function render() {
   main.appendChild(wlabel);
   const wcard = document.createElement("div");
   wcard.className = "card";
-  wcard.appendChild(makeSimpleRow(day, "warmup_dynamic", "Dynamic warm-up", "2 min", plan.warmup));
-  wcard.appendChild(makeSimpleRow(day, "warmup_ramp", "Ramp-up sets", null, plan.rampup));
+  wcard.appendChild(makeSimpleRow(day, "warmup_dynamic", "Dynamic Warm-Up", "2 min", plan.warmup));
+  wcard.appendChild(makeSetRow(day, "warmup_ramp1", "Ramp-Up Set 1", "≈50%"));
+  wcard.appendChild(makeSetRow(day, "warmup_ramp2", "Ramp-Up Set 2", "≈75%"));
   main.appendChild(wcard);
 
   // EXERCISES
@@ -559,7 +689,15 @@ function render() {
   const ecard = document.createElement("div");
   ecard.className = "card";
 
+  let lastBlock = null;
   plan.exercises.forEach((ex, i) => {
+    if (ex.block && ex.block !== lastBlock) {
+      const bl = document.createElement("div");
+      bl.className = "block-label";
+      bl.textContent = ex.block;
+      ecard.appendChild(bl);
+      lastBlock = ex.block;
+    }
     const block = document.createElement("div");
     block.className = "exercise";
 
@@ -594,7 +732,11 @@ function render() {
       sets.appendChild(makeSetRow(day, "ex" + i + "_set" + s, "Set " + s, ex.reps + " reps"));
       const finalRestOfDay = (i === lastEx) && (s === ex.sets);
       if (!finalRestOfDay) {
-        sets.appendChild(makeSetRow(day, "ex" + i + "_rest" + s, "Rest", ex.rest));
+        let nextReps, nextName;
+        if (s < ex.sets) { nextReps = ex.reps; nextName = ex.name; }
+        else { const nx = plan.exercises[i + 1]; nextReps = nx.reps; nextName = nx.name; }
+        const upNext = nextReps + " Reps of " + nextName;
+        sets.appendChild(makeSetRow(day, "ex" + i + "_rest" + s, "Rest", ex.rest, { upNext: upNext, rest: ex.rest }));
       }
     }
     block.appendChild(sets);
@@ -609,7 +751,7 @@ function render() {
   main.appendChild(clabel);
   const ccard = document.createElement("div");
   ccard.className = "card";
-  ccard.appendChild(makeSimpleRow(day, "cooldown", "Cooldown stretch", "8–10 min", "Static stretches for the muscles you trained. Slow it down and breathe."));
+  ccard.appendChild(makeSimpleRow(day, "cooldown", "Cooldown stretch", "8 min", "Static stretches for the muscles you trained. Slow it down and breathe."));
   main.appendChild(ccard);
 
   updateProgress();
@@ -619,8 +761,6 @@ function updateProgress() {
   const ids = buildIds(currentDay);
   const total = ids.length;
   const done = ids.filter(id => isChecked(currentDay, id)).length;
-  document.getElementById("progDone").textContent = done;
-  document.getElementById("progTotal").textContent = total;
   document.getElementById("progFill").style.width = (total ? (done / total * 100) : 0) + "%";
   document.getElementById("doneBanner").classList.toggle("show", done === total && total > 0);
 }
@@ -660,6 +800,82 @@ resetBtn.addEventListener("click", () => {
   buildIds(currentDay).forEach(id => setChecked(currentDay, id, false));
   render();
 });
+
+/* ---------------- Rest Timer ---------------- */
+(function () {
+  const overlay = document.getElementById("timerOverlay");
+  const closeBtn = document.getElementById("timerClose");
+  const ringFg = document.getElementById("ringFg");
+  const ringTime = document.getElementById("ringTime");
+  const ringSub = document.getElementById("ringSub");
+  const upNextEl = document.getElementById("upNext");
+
+  const CIRC = 2 * Math.PI * 100; // r=100
+  ringFg.setAttribute("stroke-dasharray", CIRC.toFixed(1));
+  ringFg.setAttribute("stroke-dashoffset", CIRC.toFixed(1));
+
+  let totalSec = 0;
+  let remaining = 0;
+  let intervalId = null;
+  let running = false;
+
+  function fmt(sec) {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return m + ":" + String(s).padStart(2, "0");
+  }
+  function setRing(fraction) {
+    const offset = CIRC * (1 - fraction);
+    ringFg.setAttribute("stroke-dashoffset", offset.toFixed(2));
+  }
+  function stopTick() {
+    if (intervalId) { clearInterval(intervalId); intervalId = null; }
+  }
+  function startTick() {
+    stopTick();
+    intervalId = setInterval(tick, 1000);
+  }
+  function tick() {
+    if (!running) return;
+    remaining -= 1;
+    if (remaining <= 0) {
+      remaining = 0;
+      ringTime.textContent = "0:00";
+      setRing(1);
+      ringSub.textContent = "Done";
+      stopTick();
+      running = false;
+      if (navigator.vibrate) { try { navigator.vibrate([200, 100, 200]); } catch (e) {} }
+      setTimeout(() => { if (ringSub.textContent === "Done") closeTimer(); }, 1400);
+      return;
+    }
+    ringTime.textContent = fmt(remaining);
+    setRing((totalSec - remaining) / totalSec);
+  }
+  function closeTimer() {
+    stopTick();
+    running = false;
+    overlay.classList.remove("show");
+  }
+
+  // Opens the modal and immediately starts counting down.
+  function openTimer(spec) {
+    const secs = parseRest(spec.rest).low; // single value now
+    totalSec = secs;
+    remaining = secs;
+    upNextEl.textContent = spec.upNext ? "Up Next: " + spec.upNext : "";
+    setRing(0);
+    ringTime.textContent = fmt(remaining);
+    ringSub.textContent = "Remaining";
+    running = true;
+    overlay.classList.add("show");
+    startTick();
+  }
+  window.openTimer = openTimer;
+
+  closeBtn.addEventListener("click", closeTimer);
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) closeTimer(); });
+})();
 
 render();
 </script>
