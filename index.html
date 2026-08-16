@@ -865,8 +865,18 @@ resetBtn.addEventListener("click", () => {
   let intervalId = null;
   let closeToken = 0;      // invalidates a pending auto-dismiss when a new timer starts
 
-  /* ----- audio: soft two-note synth pulse, foreground only ----- */
-  let audioCtx = null;
+  /* ----- audio -----
+     iOS suspends an AudioContext that has been idle, and a suspended context
+     can only be resumed from a user gesture. Firing the chime from a setInterval
+     callback 60s later therefore hits a dead context and silently does nothing.
+     Fix: schedule the chime on the Web Audio clock at the moment the rest starts
+     (while we still have the tap), and hold the context open with an inaudible
+     keep-alive tone so iOS doesn't idle it out. The audio thread plays the
+     scheduled sound whether or not JS is running at that instant. ----- */
+  let audioCtx  = null;
+  let scheduled = [];       // live nodes, torn down if the rest is cancelled
+  let keepAlive = null;
+  let chimeArmed = false;   // true once a chime is queued on the audio clock
 
   function unlockAudio() {
     try {
@@ -896,6 +906,7 @@ resetBtn.addEventListener("click", () => {
     gain.connect(dest);
     osc.start(t);
     osc.stop(t + release + 0.05);
+    scheduled.push(osc);
   }
 
   // Master chain: lowpass -> volume -> limiter -> out.
@@ -957,6 +968,55 @@ resetBtn.addEventListener("click", () => {
     try { fn(audioCtx.currentTime); } catch (e) {}
   }
 
+  // Inaudible tone that runs for the length of the rest. Without an active
+  // source iOS treats the context as idle and suspends it before the chime.
+  function startKeepAlive(secs) {
+    if (!audioCtx) return;
+    try {
+      const osc  = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      gain.gain.value = 0.0001;
+      osc.type = "sine";
+      osc.frequency.value = 20;
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + secs + 3);
+      keepAlive = osc;
+    } catch (e) {}
+  }
+
+  function cancelAudio() {
+    scheduled.forEach(n => {
+      try { n.stop(); } catch (e) {}
+      try { n.disconnect(); } catch (e) {}
+    });
+    scheduled = [];
+    if (keepAlive) {
+      try { keepAlive.stop(); } catch (e) {}
+      try { keepAlive.disconnect(); } catch (e) {}
+      keepAlive = null;
+    }
+    chimeArmed = false;
+  }
+
+  // Queue the chime on the audio clock for `secs` from now. Called inside the
+  // tap that starts the rest, which is what makes it legal on iOS.
+  function armChime(secs) {
+    unlockAudio();
+    if (!audioCtx) return;
+    const arm = () => {
+      if (audioCtx.state !== "running") return;
+      try {
+        startKeepAlive(secs);
+        (CHIMES[ACTIVE_CHIME] || CHIMES[1])(audioCtx.currentTime + secs);
+        chimeArmed = true;
+      } catch (e) {}
+    };
+    if (audioCtx.state === "running") arm();
+    else audioCtx.resume().then(arm).catch(() => {});
+  }
+
 
   /* ----- persistence so the countdown survives lock / suspend ----- */
   function persist(upNext) {
@@ -1006,12 +1066,15 @@ resetBtn.addEventListener("click", () => {
     timeEl.textContent = "0:00";
     barFill.style.width = "100%";
     subEl.textContent = "Done";
-    playChime(ACTIVE_CHIME);
+    if (!chimeArmed) playChime(ACTIVE_CHIME);  // fallback if scheduling was refused
+    scheduled = [];        // let the tail ring out; don't tear it down on close
+    chimeArmed = false;
     const token = ++closeToken;
     setTimeout(() => { if (token === closeToken) hardClose(); }, HOLD_MS);
   }
 
   function hardClose() {
+    cancelAudio();
     running = false;
     stopTick();
     clearPersist();
@@ -1021,9 +1084,10 @@ resetBtn.addEventListener("click", () => {
 
   // Starting a new rest replaces whatever is on screen, mid-countdown or mid-"Done".
   function openTimer(spec) {
-    unlockAudio();                     // rides the tap that checked the box
     const secs = parseRest(spec.rest).low;
     closeToken++;                      // cancel any pending auto-dismiss
+    cancelAudio();                     // drop any chime queued by a previous rest
+    armChime(secs);                    // rides the tap that checked the box
     stopTick();
     totalSec = secs;
     endTime  = Date.now() + secs * 1000;
